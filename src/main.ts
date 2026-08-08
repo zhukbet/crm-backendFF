@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import './common/bigint-json';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
