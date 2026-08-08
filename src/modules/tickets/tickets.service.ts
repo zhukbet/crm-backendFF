@@ -218,4 +218,13 @@ export class TicketsService {
     }
     return results;
   }
+
+  /** Section 12: "повний audit log" — the events PATCH/assign/close already write. */
+  listEvents(ticketId: string) {
+    return this.prisma.ticketEvent.findMany({
+      where: { ticketId },
+      orderBy: { createdAt: 'desc' },
+      include: { agent: true },
+    });
+  }
 }

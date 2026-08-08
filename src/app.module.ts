@@ -10,6 +10,7 @@ import { HealthModule } from './modules/health/health.module';
 import { NotificationsHttpModule } from './modules/notifications/notifications-http.module';
 import { OrganizationsModule } from './modules/organizations/organizations.module';
 import { SavedViewsModule } from './modules/saved-views/saved-views.module';
+import { TeamsModule } from './modules/teams/teams.module';
 import { TelegramWebhookModule } from './modules/telegram/telegram-webhook.module';
 import { TicketsModule } from './modules/tickets/tickets.module';
 
@@ -32,6 +33,7 @@ import { TicketsModule } from './modules/tickets/tickets.module';
     SavedViewsModule,
     CannedResponsesModule,
     OrganizationsModule,
+    TeamsModule,
     HealthModule,
   ],
   providers: [ApiEventSubscriber],

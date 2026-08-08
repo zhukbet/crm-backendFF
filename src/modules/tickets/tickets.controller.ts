@@ -12,6 +12,7 @@ import { ReplyTicketDto } from './dto/reply-ticket.dto';
 import { CommentsService } from './comments.service';
 import { MessagesService } from './messages.service';
 import { TicketsService } from './tickets.service';
+import { ExcludedSendersService } from '../excluded-senders/excluded-senders.service';
 
 @ApiTags('tickets')
 @Controller('tickets')
@@ -21,6 +22,7 @@ export class TicketsController {
     private readonly tickets: TicketsService,
     private readonly messages: MessagesService,
     private readonly comments: CommentsService,
+    private readonly excludedSenders: ExcludedSendersService,
   ) {}
 
   @Get()
@@ -96,5 +98,18 @@ export class TicketsController {
   @Post('bulk')
   bulk(@Body() dto: BulkActionDto, @CurrentAgent() agent: Agent) {
     return this.tickets.bulk(dto.ticket_ids, dto.action, dto.payload, agent.id);
+  }
+
+  /** Section 12: audit log for this ticket (assign/reassign/status/priority/labels/close). */
+  @Get(':id/events')
+  listEvents(@Param('id') id: string) {
+    return this.tickets.listEvents(id);
+  }
+
+  /** Section 8a: one-click "цей не клієнт" from the ticket card — excludes the sender and
+   * closes the mistakenly-created thread. */
+  @Post(':id/mark-not-customer')
+  markNotCustomer(@Param('id') id: string, @CurrentAgent() agent: Agent) {
+    return this.excludedSenders.markTicketSenderAsNotCustomer(id, agent.id);
   }
 }
