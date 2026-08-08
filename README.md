@@ -21,22 +21,28 @@ Socket.IO. Модульний моноліт: `tickets`, `chats`, `routing`, `no
 - Seq 17–19 (M3): Telegram Login Widget (HMAC), сесія (HTTP-only cookie), ролі admin/lead/agent.
 - Seq 23 (M4): excluded-senders CRUD + resolve username→id + «Позначити як не клієнт».
 - Seq 26–27 (M5): стратегії маршрутизації manual/round_robin/least_busy, `TicketsService.assign`.
+- **Проєкт тепер реально запускається**: `main.ts`/`AppModule` (API, HTTP на `/api/*`, Swagger
+  на `/api/docs` + `/api/docs-json`, `GET /api/health`) і `worker.ts`/`WorkerModule` (окремий
+  процес) — обидва перевірені: піднімають усі модулі й падають рівно на підключенні до
+  Postgres/Redis, якщо їх нема (очікувана поведінка без `docker compose up`).
 
 **Відомі прогалини навіть у зробленому** (щоб не було ілюзії «майже готово»):
 
-- Немає `main.ts` / `worker.ts` / кореневого `AppModule`/`WorkerModule` — усі модулі написані
-  окремо, але ніде не зібрані докупи. Проєкт не запускається.
-- `EventEmitterModule.forRoot()` ніде не підключено — `EventEmitter2` наразі нічим не наповнений.
 - BullMQ-продюсери інжесту/outbound є, а самих воркерів-консюмерів (`@Processor`), які
-  розбирають чергу (Seq 7, 16), — ще нема.
+  розбирають чергу (Seq 7, 16), — ще нема. `WorkerModule` підключається до Redis, але поки
+  нічого не обробляє.
 - `RoutingService` (Seq 26) написаний, але `IngestOrchestratorService` його ще не викликає —
   зараз новий тікет бере `chat.defaultTeamId`/`defaultAssigneeId` напряму, без стратегії.
+- `TicketsModule`/`ChatsModule` як окремі NestJS-модулі ще не створені — сервіси
+  (`TicketsService`, `ChatsService`, `IngestOrchestratorService` тощо) існують, але нічим не
+  підключені до `AppModule`/`WorkerModule` (бо REST/WS-шару, який би їх використовував, ще нема
+  — Seq 13–16).
 
 Не почато: Seq 13–16 (REST/WS-шар поверх тікетів), Seq 20–22 (мінімальний frontend — не в
 цьому репозиторії), Seq 28 і далі (claim/колізії, нотифікації M6, chat_groups/директорія M7,
 аналітика M8, і все, що після). Повний список — `support_crm_backlog.xlsx`.
 
-## Запуск (коли дійде до робочого стану)
+## Запуск
 
 ```bash
 cp .env.example .env   # заповнити BOT_TOKEN, JWT_SECRET тощо
