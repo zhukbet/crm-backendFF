@@ -107,4 +107,13 @@ export class MessagesService {
       data: { tgMessageId },
     });
   }
+
+  /** Conversation history for the center panel of the inbox (section 13). */
+  listForTicket(ticketId: string) {
+    return this.prisma.message.findMany({
+      where: { ticketId },
+      orderBy: { createdAt: 'asc' },
+      include: { agent: true },
+    });
+  }
 }

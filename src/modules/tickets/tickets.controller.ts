@@ -33,6 +33,11 @@ export class TicketsController {
     return this.tickets.getById(id);
   }
 
+  @Get(':id/messages')
+  listMessages(@Param('id') id: string) {
+    return this.messages.listForTicket(id);
+  }
+
   @Patch(':id')
   patch(@Param('id') id: string, @Body() dto: PatchTicketDto, @CurrentAgent() agent: Agent) {
     return this.tickets.patch(id, dto, agent.id);
