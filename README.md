@@ -8,9 +8,9 @@ Socket.IO. Модульний моноліт: `tickets`, `chats`, `routing`, `no
 `telegram`, `auth`, `excluded-senders` — домен спілкується подіями (`EventEmitter2`), щоб нові
 фічі підписувались на події, не чіпаючи ядро.
 
-## Статус — зупинився на Seq 27 з `support_crm_backlog.xlsx`
+## Статус — зупинився на Seq 37 з `support_crm_backlog.xlsx`
 
-Зроблено (Seq 1–19, 23, 26–27 з беклогу), код є і компілюється/лінтиться/проходить тести:
+Зроблено (Seq 1–19, 23, 26–27, 29, 31–37 з беклогу), код є і компілюється/лінтиться/проходить тести:
 
 - Seq 1–4 (M0): repo init, CI, Docker Compose (api/workers/postgres/redis), Dockerfile
   з цілями `api`/`workers` (з фіксами під Alpine — див. нижче), повна Prisma-схема
@@ -39,25 +39,43 @@ Socket.IO. Модульний моноліт: `tickets`, `chats`, `routing`, `no
   його нема), і повним прогоном через `support-crm-infra`'s `docker compose up` + smoke-test
   CI (зелений, включно з реальним Postgres/Redis/reverse-proxy).
 
+- Seq 29, 31–32 (M6): нотифікації — таблиці `notifications`/`notification_prefs`,
+  `NotificationEventsListener` реагує на `message.received`/`ticket.assigned`/`comment.created`
+  (без прямих викликів із REST/ingest — чиста підписка на події, як і вимагає розділ 3.3),
+  Telegram DM-канал через того самого бота, дедуп: кілька подій по одному тікету за 5 хв
+  оновлюють один запис, а не плодять нові. REST: `/api/notifications`, `/api/notification-prefs`.
+- Seq 33–35 (M7, бекенд-частина): REST `/api/chats` (директорія з беклогом/обсягом на чат),
+  `/api/chats/:id` (налаштування — група/команда/виконавець/стратегія за замовчуванням),
+  `/api/chat-groups`.
+- Seq 36–37 (M8): фонова джоба `chat_stats_daily` (BullMQ repeatable job, щодня о 01:00 UTC) +
+  `/api/analytics/chats` і `/api/analytics/overview` (сума збережених днів + «сьогодні» на льоту,
+  як і вимагає розділ 11 ТЗ).
+- **Виправив приховану архітектурну діру у власному WS-коді з попереднього кроку**: тікети
+  найчастіше створюються в процесі Workers (інжест), а WebSocket-сервер, до якого підключені
+  браузери агентів, живе в процесі API — а `EventEmitter2` per-process, між ними нічого не
+  спільного. Без мосту `ticket:new`/`message:new` від інжесту просто ніколи не долітали б до
+  агента вживу. Додав `WorkerEventPublisher`/`ApiEventSubscriber` — Redis pub/sub міст, що
+  ретранслює доменні події з Workers в API.
+- **Проєкт реально запускається й піднімається в Docker Compose**: `main.ts`/`AppModule` (API,
+  `/api/*`, Swagger `/api/docs`+`/api/docs-json`, `GET /api/health`) і `worker.ts`/`WorkerModule`
+  — обидва перевірені і локальним boot-тестом (падають рівно на підключенні до Postgres, якщо
+  його нема), і повним прогоном через `support-crm-infra`'s `docker compose up` + smoke-test
+  CI (зелений, включно з реальним Postgres/Redis/reverse-proxy) — станом на Seq 27.
+
 **Відомі прогалини навіть у зробленому:**
 
 - Rate-limit на outbound — лише глобальний (~25 msg/s), per-chat (~1 msg/s) не реалізовано:
   потребує або власного Redis token-bucket по chat_id, або BullMQ Pro (group rate limit).
   Реальний ризик тут м'який — Telegram сам поверне 429 при перевищенні, і ретраї з backoff
   (вже налаштовані) це підхоплять, просто не так елегантно, як proactive-лімітування.
-- Нотифікації (M6), chat_groups/директорія чатів (M7), аналітика (M8) — Seq 29–38, ще не почато.
-- `RoutingModule`/`ChatsModule` не мають власного REST (chat_groups CRUD, налаштування чату —
-  Seq 33–35) — сервіси є, ендпоінтів нема.
-
-Раніше тут падав CI infra-репозиторію (`support-crm-infra`) через три реальні Docker/Alpine
-баги — усі виправлені в цьому репо: `npm ci` без закомiченого lock-файлу, `prisma` CLI як
-`devDependency` (через що `runtime`-стейдж тягнув невідповідну версію з реєстру), і відсутній
-CLI `openssl` в Alpine (через що Prisma завжди хибно визначав OpenSSL 1.1.x і падав у
-crash-loop). Деталі — в історії комітів `Dockerfile`.
-
-Не почато: Seq 13–16 (REST/WS-шар поверх тікетів), Seq 20–22 (мінімальний frontend — не в
-цьому репозиторії), Seq 28 і далі (claim/колізії, нотифікації M6, chat_groups/директорія M7,
-аналітика M8, і все, що після). Повний список — `support_crm_backlog.xlsx`.
+- Аналітика `avgFirstResponseSec`/`avgResolutionSec` за діапазон днів — неозважене середнє
+  середніх по днях, не по кожному тікету: `chat_stats_daily` зберігає лише агрегат на день,
+  не сирі семпли, тож точне зважене середнє за діапазон без зміни структури таблиці неможливе.
+- Локальний boot-тест і повний infra-прогін (Docker+Postgres+Redis) для змін цього кроку
+  (Seq 29–37) ще не перепрогнаний через `support-crm-infra` — тільки локальний DI-boot-тест
+  без реальної БД/Redis. Наступний крок — оновити submodule і прогнати smoke-test.
+- Claim/колізії (Seq 28), і все, що в CRM-рівні (Seq 39+: saved views, canned responses,
+  organizations, audit log UI, командна палітра) — ще не почато.
 
 ## Запуск
 

@@ -7,6 +7,7 @@ export const DOMAIN_EVENTS = {
   MESSAGE_SENT: 'message.sent',
   COMMENT_CREATED: 'comment.created',
   AGENT_TYPING: 'agent.typing',
+  NOTIFICATION_CREATED: 'notification.created',
 } as const;
 
 export interface TicketCreatedEvent {
@@ -44,4 +45,10 @@ export interface CommentCreatedEvent {
 export interface AgentTypingEvent {
   ticketId: string;
   agentId: string;
+}
+export interface NotificationCreatedEvent {
+  notificationId: string;
+  agentId: string;
+  type: string;
+  ticketId?: string | null;
 }

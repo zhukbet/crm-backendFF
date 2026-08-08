@@ -38,7 +38,10 @@ export class ChatsService {
     },
   ) {
     await this.getById(id);
-    return this.prisma.chat.update({ where: { id }, data: data as Prisma.ChatUpdateInput });
+    return this.prisma.chat.update({
+      where: { id },
+      data: data as Prisma.ChatUncheckedUpdateInput,
+    });
   }
 
   createGroup(name: string, color?: string, description?: string) {
