@@ -4,7 +4,9 @@ FROM node:20-alpine AS base
 WORKDIR /app
 COPY package*.json ./
 COPY prisma ./prisma
-RUN npm ci
+# package-lock.json is intentionally not committed (see the repo's git-workflow notes in
+# README), so `npm ci` isn't an option here — same reasoning as .github/workflows/ci.yml.
+RUN npm install
 
 FROM base AS build
 COPY . .
@@ -16,7 +18,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 COPY package*.json ./
 COPY prisma ./prisma
-RUN npm ci --omit=dev && npx prisma generate
+RUN npm install --omit=dev && npx prisma generate
 COPY --from=build /app/dist ./dist
 
 FROM runtime AS api
