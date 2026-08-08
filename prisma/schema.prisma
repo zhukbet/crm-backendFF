@@ -1,0 +1,368 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AgentRole {
+  admin
+  lead
+  agent
+}
+
+enum RoutingStrategy {
+  manual
+  round_robin
+  least_busy
+}
+
+enum TicketStatus {
+  open
+  pending
+  on_hold
+  solved
+  closed
+}
+
+enum TicketPriority {
+  urgent
+  high
+  normal
+  low
+}
+
+enum MessageDirection {
+  in
+  out
+}
+
+enum MessageSender {
+  customer
+  agent
+  bot
+}
+
+enum NotificationChannel {
+  in_app
+  browser
+  telegram
+  email
+}
+
+model Agent {
+  id              String    @id @default(uuid())
+  telegramUserId  BigInt    @unique @map("telegram_user_id")
+  name            String
+  username        String?
+  avatarUrl       String?   @map("avatar_url")
+  role            AgentRole @default(agent)
+  isActive        Boolean   @default(true) @map("is_active")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  teamMemberships   TeamMember[]
+  assignedTickets   Ticket[]           @relation("TicketAssignee")
+  closedTickets     Ticket[]           @relation("TicketClosedBy")
+  messages          Message[]
+  internalComments  InternalComment[]
+  ticketEvents      TicketEvent[]
+  notifications     Notification[]
+  notificationPrefs NotificationPref[]
+  excludedSendersAdded ExcludedSender[] @relation("ExcludedSenderAddedBy")
+  savedViews        SavedView[]
+  defaultForChats   Chat[]             @relation("ChatDefaultAssignee")
+
+  @@map("agents")
+}
+
+model AgentTeam {
+  id        String   @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  members       TeamMember[]
+  tickets       Ticket[]
+  defaultChats  Chat[]
+
+  @@map("agent_teams")
+}
+
+model TeamMember {
+  id        String   @id @default(uuid())
+  teamId    String   @map("team_id")
+  agentId   String   @map("agent_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  team  AgentTeam @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  agent Agent     @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, agentId])
+  @@map("team_members")
+}
+
+model ChatGroup {
+  id          String  @id @default(uuid())
+  name        String
+  color       String?
+  description String?
+
+  chats Chat[]
+
+  @@map("chat_groups")
+}
+
+model Chat {
+  id                 String          @id @default(uuid())
+  telegramChatId     BigInt          @unique @map("telegram_chat_id")
+  title              String
+  isActive           Boolean         @default(true) @map("is_active")
+  chatGroupId        String?         @map("chat_group_id")
+  defaultTeamId      String?         @map("default_team_id")
+  defaultAssigneeId  String?         @map("default_assignee_id")
+  routingStrategy    RoutingStrategy @default(manual) @map("routing_strategy")
+  defaultPriority    TicketPriority  @default(normal) @map("default_priority")
+  tags               Json            @default("[]")
+  createdAt          DateTime        @default(now()) @map("created_at")
+  updatedAt          DateTime        @updatedAt @map("updated_at")
+
+  chatGroup       ChatGroup? @relation(fields: [chatGroupId], references: [id])
+  defaultTeam     AgentTeam? @relation(fields: [defaultTeamId], references: [id])
+  defaultAssignee Agent?     @relation("ChatDefaultAssignee", fields: [defaultAssigneeId], references: [id])
+  defaultLabels   ChatDefaultLabel[]
+  tickets         Ticket[]
+  statsDaily      ChatStatsDaily[]
+
+  @@index([chatGroupId])
+  @@map("chats")
+}
+
+model ChatDefaultLabel {
+  chatId  String @map("chat_id")
+  labelId String @map("label_id")
+
+  chat  Chat  @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  label Label @relation(fields: [labelId], references: [id], onDelete: Cascade)
+
+  @@id([chatId, labelId])
+  @@map("chat_default_labels")
+}
+
+model Organization {
+  id        String  @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  customers Customer[]
+
+  @@map("organizations")
+}
+
+model Customer {
+  id             String  @id @default(uuid())
+  telegramUserId BigInt  @unique @map("telegram_user_id")
+  username       String?
+  displayName    String? @map("display_name")
+  organizationId String? @map("organization_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  organization Organization? @relation(fields: [organizationId], references: [id])
+  tickets      Ticket[]
+
+  @@map("customers")
+}
+
+model ExcludedSender {
+  id                String   @id @default(uuid())
+  telegramUserId    BigInt?  @unique @map("telegram_user_id")
+  telegramUsername  String?  @map("telegram_username")
+  name              String?
+  note              String?
+  addedByAgentId    String?  @map("added_by_agent_id")
+  isActive          Boolean  @default(true) @map("is_active")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  addedBy Agent? @relation("ExcludedSenderAddedBy", fields: [addedByAgentId], references: [id])
+
+  @@index([telegramUsername])
+  @@map("excluded_senders")
+}
+
+model Ticket {
+  id                     String         @id @default(uuid())
+  chatId                 String         @map("chat_id")
+  customerId             String         @map("customer_id")
+  status                 TicketStatus   @default(open)
+  priority               TicketPriority @default(normal)
+  assigneeId             String?        @map("assignee_id")
+  teamId                 String?        @map("team_id")
+  anchorMessageTgId      BigInt         @map("anchor_message_tg_id")
+  lastClientMessageTgId  BigInt?        @map("last_client_message_tg_id")
+  jiraKey                String?        @map("jira_key")
+  firstResponseAt        DateTime?      @map("first_response_at")
+  resolvedAt             DateTime?      @map("resolved_at")
+  snoozeUntil            DateTime?      @map("snooze_until")
+  createdAt              DateTime       @default(now()) @map("created_at")
+  updatedAt              DateTime       @updatedAt @map("updated_at")
+  closedAt               DateTime?      @map("closed_at")
+  closedById             String?        @map("closed_by")
+
+  chat     Chat      @relation(fields: [chatId], references: [id])
+  customer Customer  @relation(fields: [customerId], references: [id])
+  assignee Agent?    @relation("TicketAssignee", fields: [assigneeId], references: [id])
+  team     AgentTeam? @relation(fields: [teamId], references: [id])
+  closedBy Agent?    @relation("TicketClosedBy", fields: [closedById], references: [id])
+
+  messages         Message[]
+  labels           TicketLabel[]
+  internalComments InternalComment[]
+  events           TicketEvent[]
+  notifications    Notification[]
+
+  @@index([chatId, status])
+  @@index([assigneeId, status])
+  @@index([customerId])
+  @@map("tickets")
+}
+
+model Message {
+  id          String            @id @default(uuid())
+  ticketId    String            @map("ticket_id")
+  direction   MessageDirection
+  sender      MessageSender
+  agentId     String?           @map("agent_id")
+  // Nullable: an outgoing reply gets its real Telegram message id only after the outbound
+  // worker confirms delivery (see MessagesService.confirmOutgoingSent). Postgres allows
+  // multiple NULLs under a unique index, so pending outgoing messages never collide here.
+  tgMessageId BigInt?           @map("tg_message_id")
+  text        String?
+  attachments Json              @default("[]")
+  createdAt   DateTime          @default(now()) @map("created_at")
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  agent  Agent? @relation(fields: [agentId], references: [id])
+
+  @@unique([tgMessageId, ticketId])
+  @@index([ticketId, createdAt])
+  @@map("messages")
+}
+
+model Label {
+  id    String @id @default(uuid())
+  name  String @unique
+  color String
+
+  tickets      TicketLabel[]
+  defaultChats ChatDefaultLabel[]
+
+  @@map("labels")
+}
+
+model TicketLabel {
+  ticketId String @map("ticket_id")
+  labelId  String @map("label_id")
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  label  Label  @relation(fields: [labelId], references: [id], onDelete: Cascade)
+
+  @@id([ticketId, labelId])
+  @@map("ticket_labels")
+}
+
+model InternalComment {
+  id        String   @id @default(uuid())
+  ticketId  String   @map("ticket_id")
+  agentId   String   @map("agent_id")
+  body      String
+  mentions  Json     @default("[]")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  agent  Agent  @relation(fields: [agentId], references: [id])
+
+  @@index([ticketId])
+  @@map("internal_comments")
+}
+
+model SavedView {
+  id      String  @id @default(uuid())
+  ownerId String? @map("owner_id")
+  name    String
+  filter  Json
+  sort    Json?
+
+  owner Agent? @relation(fields: [ownerId], references: [id])
+
+  @@map("saved_views")
+}
+
+model CannedResponse {
+  id        String  @id @default(uuid())
+  title     String
+  body      String
+  scope     String  @default("global")
+  variables Json    @default("[]")
+
+  @@map("canned_responses")
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  agentId   String   @map("agent_id")
+  type      String
+  ticketId  String?  @map("ticket_id")
+  payload   Json     @default("{}")
+  isRead    Boolean  @default(false) @map("is_read")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  agent  Agent   @relation(fields: [agentId], references: [id])
+  ticket Ticket? @relation(fields: [ticketId], references: [id])
+
+  @@index([agentId, isRead])
+  @@map("notifications")
+}
+
+model NotificationPref {
+  agentId   String              @map("agent_id")
+  channel   NotificationChannel
+  eventType String              @map("event_type")
+  enabled   Boolean             @default(true)
+
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@id([agentId, channel, eventType])
+  @@map("notification_prefs")
+}
+
+model TicketEvent {
+  id        String   @id @default(uuid())
+  ticketId  String   @map("ticket_id")
+  agentId   String?  @map("agent_id")
+  type      String
+  payload   Json     @default("{}")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  agent  Agent? @relation(fields: [agentId], references: [id])
+
+  @@index([ticketId, createdAt])
+  @@map("ticket_events")
+}
+
+model ChatStatsDaily {
+  chatId              String   @map("chat_id")
+  date                DateTime @db.Date
+  ticketsOpened       Int      @default(0) @map("tickets_opened")
+  ticketsClosed       Int      @default(0) @map("tickets_closed")
+  messagesIn          Int      @default(0) @map("messages_in")
+  messagesOut         Int      @default(0) @map("messages_out")
+  avgFirstResponseSec Int?     @map("avg_first_response_sec")
+  avgResolutionSec    Int?     @map("avg_resolution_sec")
+
+  chat Chat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  @@id([chatId, date])
+  @@map("chat_stats_daily")
+}
