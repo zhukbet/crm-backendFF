@@ -17,8 +17,13 @@ FROM node:20-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 COPY package*.json ./
-COPY prisma ./prisma
-RUN npm install --omit=dev && npx prisma generate
+# `prisma` (the CLI) is a devDependency, so a fresh `npm install --omit=dev` here wouldn't
+# have it locally — `npx prisma generate` would then silently fetch the *latest* CLI from the
+# registry instead of the pinned 5.22.0, generating an engine binary that doesn't match
+# @prisma/client's version and crash-looping at runtime. Generating once in `build` (which has
+# the full, correctly pinned toolchain) and copying the result here avoids that entirely.
+RUN npm install --omit=dev
+COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=build /app/dist ./dist
 
 FROM runtime AS api
