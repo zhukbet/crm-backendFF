@@ -86,6 +86,7 @@ export class MessagesService {
 
     await this.outboundProducer.enqueueReply({
       ticketId: ticket.id,
+      messageId: message.id,
       telegramChatId: String(ticket.chat.telegramChatId),
       text: params.text,
       replyToTgMessageId: replyToTgMessageId ? String(replyToTgMessageId) : undefined,

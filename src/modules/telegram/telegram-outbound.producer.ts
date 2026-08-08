@@ -5,6 +5,8 @@ import { JOB_OUTBOUND_SEND, QUEUE_OUTBOUND } from '../../common/queues/queue.con
 
 export interface OutboundReplyJob {
   ticketId: string;
+  /** DB id of the already-created Message row this job must fill in tg_message_id for. */
+  messageId: string;
   telegramChatId: string;
   text: string;
   replyToTgMessageId?: string;
@@ -18,8 +20,10 @@ export class TelegramOutboundProducer {
     await this.queue.add(JOB_OUTBOUND_SEND, job, {
       attempts: 5,
       backoff: { type: 'exponential', delay: 1000 },
-      // Telegram outbound rate limits (~30 msg/s global, ~1 msg/s per chat) are enforced by
-      // BullMQ's per-queue/per-group rate limiter configured on the worker side (outbound.processor).
+      // Global rate limit (~30 msg/s) is enforced by the BullMQ Worker's `limiter` option in
+      // outbound.processor.ts. Per-chat (~1 msg/s) is NOT enforced — that needs either a
+      // custom Redis token-bucket keyed by chat, or BullMQ Pro's per-group rate limiting,
+      // neither of which is implemented yet.
       removeOnComplete: 1000,
       removeOnFail: 5000,
     });

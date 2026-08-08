@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { ClientDetectionService } from '../telegram/client-detection.service';
 import { NormalizedIncomingMessage } from '../telegram/telegram.types';
 import { ChatsService } from '../chats/chats.service';
+import { RoutingService } from '../routing/routing.service';
 import { CustomersService } from './customers.service';
 import { MessagesService } from './messages.service';
 import { TicketsService } from './tickets.service';
@@ -29,6 +30,7 @@ export class IngestOrchestratorService {
     private readonly threadGrouping: ThreadGroupingService,
     private readonly tickets: TicketsService,
     private readonly messages: MessagesService,
+    private readonly routing: RoutingService,
     private readonly config: ConfigService,
   ) {}
 
@@ -78,13 +80,16 @@ export class IngestOrchestratorService {
       }
       this.logger.debug(`Message attached to ticket ${ticketId} via rule ${decision.matchedRule}`);
     } else {
+      // Section 9: new tickets get a team/assignee decided by the chat's routing strategy
+      // (manual/round_robin/least_busy), not just the chat's raw defaults.
+      const routingDecision = await this.routing.decideAssignment(chat);
       const ticket = await this.tickets.createForNewThread({
         chatId: chat.id,
         customerId: customer.id,
         anchorMessageTgId: BigInt(message.tgMessageId),
         priority: chat.defaultPriority,
-        teamId: chat.defaultTeamId,
-        assigneeId: chat.defaultAssigneeId,
+        teamId: routingDecision.teamId,
+        assigneeId: routingDecision.assigneeId,
       });
       ticketId = ticket.id;
       isNewTicket = true;

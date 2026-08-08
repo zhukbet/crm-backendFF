@@ -4,6 +4,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { ExcludedSendersModule } from './modules/excluded-senders/excluded-senders.module';
 import { HealthModule } from './modules/health/health.module';
 import { TelegramWebhookModule } from './modules/telegram/telegram-webhook.module';
+import { TicketsModule } from './modules/tickets/tickets.module';
 
 /**
  * The API process (main.ts): HTTP + WS. Does not include queue processors — those live in
@@ -15,6 +16,7 @@ import { TelegramWebhookModule } from './modules/telegram/telegram-webhook.modul
     TelegramWebhookModule,
     AuthModule,
     ExcludedSendersModule,
+    TicketsModule,
     HealthModule,
   ],
 })

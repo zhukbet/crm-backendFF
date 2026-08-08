@@ -10,33 +10,50 @@ Socket.IO. Модульний моноліт: `tickets`, `chats`, `routing`, `no
 
 ## Статус — зупинився на Seq 27 з `support_crm_backlog.xlsx`
 
-Зроблено (Seq 1–12, 17–19, 23, 26–27 з беклогу), код є і компілюється/лінтиться/проходить тести:
+Зроблено (Seq 1–19, 23, 26–27 з беклогу), код є і компілюється/лінтиться/проходить тести:
 
 - Seq 1–4 (M0): repo init, CI, Docker Compose (api/workers/postgres/redis), Dockerfile
-  з цілями `api`/`workers`, повна Prisma-схема (розділ 5 ТЗ), початкова міграція, seed.
+  з цілями `api`/`workers` (з фіксами під Alpine — див. нижче), повна Prisma-схема
+  (розділ 5 ТЗ), початкова міграція, seed.
 - Seq 5–10 (M1): Telegram webhook (перевірка secret token), нормалізація апдейтів,
   `ClientDetectionService`, **логіка групування тредів (правила 1–3, розділ 4)** — 9 юніт-тестів.
-- Seq 11–12 (M2, частково): сервіси `tickets`/`messages`/`labels`/`internal comments`,
-  доменні події через `EventEmitter2`.
+- Seq 11–12 (M2): сервіси `tickets`/`messages`/`labels`/`internal comments`, доменні події
+  через `EventEmitter2` (`EventEmitterModule.forRoot()` підключено в `CoreInfraModule`).
+- Seq 13–14 (M2): REST `/api/tickets` — список з фільтрами й курсорною пагінацією, get/patch,
+  reply, comments, assign, close/reopen/snooze, bulk.
+- Seq 15 (M2): WebSocket `/ws` — `ticket:new/updated/assigned`, `message:new`, `comment:new`,
+  `agent:typing` (кімнати `ticket:<id>`, приєднання через `ticket:join`/`ticket:leave`).
+  З'єднання гейтиться тією ж сесійною кукою, що й REST (немає активного агента — дисконект).
+- Seq 16 (M2): outbound-черга — `OutboundProcessor` реально шле `sendMessage` в Telegram і
+  підтверджує `tg_message_id` на повідомленні; глобальний rate-limit (~25/с) через BullMQ.
+- Seq 7 (M1): `IngestProcessor` реально розбирає чергу інжесту й запускає
+  `IngestOrchestratorService` — вхідні повідомлення з Telegram тепер справді стають тікетами.
 - Seq 17–19 (M3): Telegram Login Widget (HMAC), сесія (HTTP-only cookie), ролі admin/lead/agent.
 - Seq 23 (M4): excluded-senders CRUD + resolve username→id + «Позначити як не клієнт».
-- Seq 26–27 (M5): стратегії маршрутизації manual/round_robin/least_busy, `TicketsService.assign`.
-- **Проєкт тепер реально запускається**: `main.ts`/`AppModule` (API, HTTP на `/api/*`, Swagger
-  на `/api/docs` + `/api/docs-json`, `GET /api/health`) і `worker.ts`/`WorkerModule` (окремий
-  процес) — обидва перевірені: піднімають усі модулі й падають рівно на підключенні до
-  Postgres/Redis, якщо їх нема (очікувана поведінка без `docker compose up`).
+- Seq 26–27 (M5): стратегії маршрутизації manual/round_robin/least_busy — тепер і справді
+  застосовуються при створенні нового тікета (`IngestOrchestratorService` кличе
+  `RoutingService.decideAssignment`, а не бере `chat.defaultTeamId`/`defaultAssigneeId` напряму).
+- **Проєкт реально запускається й піднімається в Docker Compose**: `main.ts`/`AppModule` (API,
+  `/api/*`, Swagger `/api/docs`+`/api/docs-json`, `GET /api/health`) і `worker.ts`/`WorkerModule`
+  — обидва перевірені і локальним boot-тестом (падають рівно на підключенні до Postgres, якщо
+  його нема), і повним прогоном через `support-crm-infra`'s `docker compose up` + smoke-test
+  CI (зелений, включно з реальним Postgres/Redis/reverse-proxy).
 
-**Відомі прогалини навіть у зробленому** (щоб не було ілюзії «майже готово»):
+**Відомі прогалини навіть у зробленому:**
 
-- BullMQ-продюсери інжесту/outbound є, а самих воркерів-консюмерів (`@Processor`), які
-  розбирають чергу (Seq 7, 16), — ще нема. `WorkerModule` підключається до Redis, але поки
-  нічого не обробляє.
-- `RoutingService` (Seq 26) написаний, але `IngestOrchestratorService` його ще не викликає —
-  зараз новий тікет бере `chat.defaultTeamId`/`defaultAssigneeId` напряму, без стратегії.
-- `TicketsModule`/`ChatsModule` як окремі NestJS-модулі ще не створені — сервіси
-  (`TicketsService`, `ChatsService`, `IngestOrchestratorService` тощо) існують, але нічим не
-  підключені до `AppModule`/`WorkerModule` (бо REST/WS-шару, який би їх використовував, ще нема
-  — Seq 13–16).
+- Rate-limit на outbound — лише глобальний (~25 msg/s), per-chat (~1 msg/s) не реалізовано:
+  потребує або власного Redis token-bucket по chat_id, або BullMQ Pro (group rate limit).
+  Реальний ризик тут м'який — Telegram сам поверне 429 при перевищенні, і ретраї з backoff
+  (вже налаштовані) це підхоплять, просто не так елегантно, як proactive-лімітування.
+- Нотифікації (M6), chat_groups/директорія чатів (M7), аналітика (M8) — Seq 29–38, ще не почато.
+- `RoutingModule`/`ChatsModule` не мають власного REST (chat_groups CRUD, налаштування чату —
+  Seq 33–35) — сервіси є, ендпоінтів нема.
+
+Раніше тут падав CI infra-репозиторію (`support-crm-infra`) через три реальні Docker/Alpine
+баги — усі виправлені в цьому репо: `npm ci` без закомiченого lock-файлу, `prisma` CLI як
+`devDependency` (через що `runtime`-стейдж тягнув невідповідну версію з реєстру), і відсутній
+CLI `openssl` в Alpine (через що Prisma завжди хибно визначав OpenSSL 1.1.x і падав у
+crash-loop). Деталі — в історії комітів `Dockerfile`.
 
 Не почато: Seq 13–16 (REST/WS-шар поверх тікетів), Seq 20–22 (мінімальний frontend — не в
 цьому репозиторії), Seq 28 і далі (claim/колізії, нотифікації M6, chat_groups/директорія M7,
