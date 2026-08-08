@@ -40,7 +40,12 @@ describe('ThreadGroupingService (spec. section 4)', () => {
       now,
     });
 
-    expect(decision).toEqual({ action: 'attach', ticketId: 'ticket-anchor', revive: false, matchedRule: 1 });
+    expect(decision).toEqual({
+      action: 'attach',
+      ticketId: 'ticket-anchor',
+      revive: false,
+      matchedRule: 1,
+    });
   });
 
   it('rule 1: revives a pending/on_hold/solved thread when replied to', async () => {
@@ -54,7 +59,12 @@ describe('ThreadGroupingService (spec. section 4)', () => {
       now,
     });
 
-    expect(decision).toEqual({ action: 'attach', ticketId: 'ticket-anchor', revive: true, matchedRule: 1 });
+    expect(decision).toEqual({
+      action: 'attach',
+      ticketId: 'ticket-anchor',
+      revive: true,
+      matchedRule: 1,
+    });
   });
 
   it('rule 1: a reply targeting a message in a closed ticket does not reopen it, falls through to rule 2/3', async () => {
@@ -86,7 +96,12 @@ describe('ThreadGroupingService (spec. section 4)', () => {
       now,
     });
 
-    expect(decision).toEqual({ action: 'attach', ticketId: 'ticket-2', revive: false, matchedRule: 2 });
+    expect(decision).toEqual({
+      action: 'attach',
+      ticketId: 'ticket-2',
+      revive: false,
+      matchedRule: 2,
+    });
   });
 
   it('rule 2: exactly at the idle-window boundary counts as expired (strict less-than)', async () => {
@@ -120,7 +135,12 @@ describe('ThreadGroupingService (spec. section 4)', () => {
       now,
     });
 
-    expect(decision).toEqual({ action: 'attach', ticketId: 'ticket-2', revive: true, matchedRule: 2 });
+    expect(decision).toEqual({
+      action: 'attach',
+      ticketId: 'ticket-2',
+      revive: true,
+      matchedRule: 2,
+    });
   });
 
   it('rule 2: a closed ticket is never matched, even if most recent', async () => {

@@ -28,8 +28,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-      - run: npm ci
+      # package-lock.json is intentionally not committed (see ~/.gitignore), so we can't use
+      # `npm ci` or actions/setup-node's built-in npm cache (both require a committed lockfile).
+      - run: npm install
       - run: npm run lint
       - run: npx prisma generate
       - run: npx prisma migrate deploy

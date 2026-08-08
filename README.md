@@ -8,23 +8,33 @@ Socket.IO. Модульний моноліт: `tickets`, `chats`, `routing`, `no
 `telegram`, `auth`, `excluded-senders` — домен спілкується подіями (`EventEmitter2`), щоб нові
 фічі підписувались на події, не чіпаючи ядро.
 
-## Статус
+## Статус — зупинився на Seq 27 з `support_crm_backlog.xlsx`
 
-Проєкт у розробці. На поточний момент реалізовано (з юніт-тестами де це доменна логіка):
+Зроблено (Seq 1–12, 17–19, 23, 26–27 з беклогу), код є і компілюється/лінтиться/проходить тести:
 
-- Каркас репозиторію, CI, Docker Compose (api/workers/postgres/redis), Dockerfile з цілями
-  `api`/`workers`.
-- Повна Prisma-схема моделі даних (розділ 5 ТЗ) + початкова міграція + seed.
-- Telegram webhook (перевірка secret token), нормалізація апдейтів, BullMQ-інжест з дедупом.
-- `ClientDetectionService` — хто клієнт/агент/виключений відправник.
-- **Логіка групування тредів (правила 1–3, розділ 4 ТЗ)** — покрита юніт-тестами.
-- Домен tickets/messages/labels/internal comments, event bus.
-- Auth: Telegram Login Widget (HMAC), сесія (HTTP-only cookie), ролі admin/lead/agent.
-- Excluded senders: CRUD, resolve username→id, «Позначити як не клієнт».
-- Routing: manual/round_robin/least_busy.
+- Seq 1–4 (M0): repo init, CI, Docker Compose (api/workers/postgres/redis), Dockerfile
+  з цілями `api`/`workers`, повна Prisma-схема (розділ 5 ТЗ), початкова міграція, seed.
+- Seq 5–10 (M1): Telegram webhook (перевірка secret token), нормалізація апдейтів,
+  `ClientDetectionService`, **логіка групування тредів (правила 1–3, розділ 4)** — 9 юніт-тестів.
+- Seq 11–12 (M2, частково): сервіси `tickets`/`messages`/`labels`/`internal comments`,
+  доменні події через `EventEmitter2`.
+- Seq 17–19 (M3): Telegram Login Widget (HMAC), сесія (HTTP-only cookie), ролі admin/lead/agent.
+- Seq 23 (M4): excluded-senders CRUD + resolve username→id + «Позначити як не клієнт».
+- Seq 26–27 (M5): стратегії маршрутизації manual/round_robin/least_busy, `TicketsService.assign`.
 
-Ще не підключено в `AppModule`/`WorkerModule` і не має REST/WS-шару поверх: див. відкриті задачі
-в `support_crm_backlog.xlsx` (Seq 13–16, 29–38 і далі) — це наступний крок.
+**Відомі прогалини навіть у зробленому** (щоб не було ілюзії «майже готово»):
+
+- Немає `main.ts` / `worker.ts` / кореневого `AppModule`/`WorkerModule` — усі модулі написані
+  окремо, але ніде не зібрані докупи. Проєкт не запускається.
+- `EventEmitterModule.forRoot()` ніде не підключено — `EventEmitter2` наразі нічим не наповнений.
+- BullMQ-продюсери інжесту/outbound є, а самих воркерів-консюмерів (`@Processor`), які
+  розбирають чергу (Seq 7, 16), — ще нема.
+- `RoutingService` (Seq 26) написаний, але `IngestOrchestratorService` його ще не викликає —
+  зараз новий тікет бере `chat.defaultTeamId`/`defaultAssigneeId` напряму, без стратегії.
+
+Не почато: Seq 13–16 (REST/WS-шар поверх тікетів), Seq 20–22 (мінімальний frontend — не в
+цьому репозиторії), Seq 28 і далі (claim/колізії, нотифікації M6, chat_groups/директорія M7,
+аналітика M8, і все, що після). Повний список — `support_crm_backlog.xlsx`.
 
 ## Запуск (коли дійде до робочого стану)
 
@@ -49,10 +59,10 @@ npm run start:worker:dev  # Workers, окремий процес
 ```bash
 git checkout main
 git pull origin main
-git checkout -b Dima          # своя гілка від актуального main
+git checkout -b <своє_ім'я>   # своя гілка від актуального main, напр. Dima
 ```
 
-Назва гілки — своя (`Dima`, `Olga`, або `Dima/excluded-senders` під конкретну задачу).
+Назва гілки — своя зі своїм іменем (напр. `Dima`, `Olga`, або `Dima/excluded-senders` під конкретну задачу).
 
 ### 2. Пiдтягнути свіжі зміни з main у свою гілку
 
@@ -61,7 +71,7 @@ git checkout -b Dima          # своя гілка від актуальног�
 ```bash
 git checkout main
 git pull origin main
-git checkout Dima
+git checkout <своє_ім'я>
 git merge main                # або: git rebase main
 ```
 
@@ -78,10 +88,10 @@ git merge --continue           # якщо merge; для rebase: git rebase --con
 ```bash
 git add <файли>
 git commit -m "коротко що зробив"
-git push origin Dima
+git push origin <своє_ім'я>
 ```
 
-Потім — Pull Request з `Dima` в `main` (не push напряму в `main`), щоб хтось інший міг
+Потім — Pull Request зі своєї гілки в `main` (не push напряму в `main`), щоб хтось інший міг
 подивитись на зміни перед мержем. Після мержу PR — оновити свою локальну `main`:
 
 ```bash

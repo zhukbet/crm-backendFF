@@ -1,12 +1,4 @@
-import {
-  Body,
-  Controller,
-  ForbiddenException,
-  Get,
-  Post,
-  Res,
-  UseGuards,
-} from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Post, Res, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { PrismaService } from '../../common/prisma/prisma.service';
@@ -27,10 +19,7 @@ export class AuthController {
   ) {}
 
   @Post('auth/telegram/callback')
-  async telegramCallback(
-    @Body() dto: TelegramLoginDto,
-    @Res({ passthrough: true }) res: Response,
-  ) {
+  async telegramCallback(@Body() dto: TelegramLoginDto, @Res({ passthrough: true }) res: Response) {
     if (!this.telegram.verifyLoginWidget(dto)) {
       throw new ForbiddenException('Invalid Telegram Login signature');
     }

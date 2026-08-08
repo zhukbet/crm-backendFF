@@ -137,7 +137,12 @@ export class TicketsService {
       }
 
       await tx.ticketEvent.create({
-        data: { ticketId: id, agentId: byAgentId ?? undefined, type: 'updated', payload: dto as any },
+        data: {
+          ticketId: id,
+          agentId: byAgentId ?? undefined,
+          type: 'updated',
+          payload: dto as any,
+        },
       });
 
       return updated;
@@ -192,7 +197,12 @@ export class TicketsService {
     return this.patch(id, { status: 'on_hold', snooze_until: until }, byAgentId);
   }
 
-  async bulk(ticketIds: string[], action: 'assign' | 'close' | 'label', payload: Record<string, unknown>, byAgentId: string) {
+  async bulk(
+    ticketIds: string[],
+    action: 'assign' | 'close' | 'label',
+    payload: Record<string, unknown>,
+    byAgentId: string,
+  ) {
     const results = [];
     for (const id of ticketIds) {
       if (action === 'assign') {

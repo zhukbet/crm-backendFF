@@ -72,7 +72,10 @@ export class MessagesService {
           // delivery (see confirmOutgoingSent below).
           tgMessageId: null,
           text: params.text,
-          attachments: (params.attachments ?? []).map((fileId) => ({ type: 'file', fileId })) as any,
+          attachments: (params.attachments ?? []).map((fileId) => ({
+            type: 'file',
+            fileId,
+          })) as any,
         },
       });
       if (!ticket.firstResponseAt) {

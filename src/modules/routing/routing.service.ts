@@ -49,7 +49,8 @@ export class RoutingService {
     });
     const lastAssignedAt = new Map(memberIds.map((id) => [id, new Date(0)]));
     for (const row of lastAssigned) {
-      if (row.assigneeId && row._max.createdAt) lastAssignedAt.set(row.assigneeId, row._max.createdAt);
+      if (row.assigneeId && row._max.createdAt)
+        lastAssignedAt.set(row.assigneeId, row._max.createdAt);
     }
     const [nextAgentId] = [...lastAssignedAt.entries()].sort(
       (a, b) => a[1].getTime() - b[1].getTime(),

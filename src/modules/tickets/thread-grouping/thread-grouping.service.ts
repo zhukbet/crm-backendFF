@@ -27,7 +27,10 @@ export class ThreadGroupingService {
     // Rule 1: reply to a message that already belongs to a thread — always wins, regardless
     // of how long ago that thread was active, and revives it even if pending/on_hold/solved.
     if (input.replyToTgMessageId !== undefined) {
-      const anchor = await this.repo.findTicketByAnchorMessage(input.chatId, input.replyToTgMessageId);
+      const anchor = await this.repo.findTicketByAnchorMessage(
+        input.chatId,
+        input.replyToTgMessageId,
+      );
       if (anchor && anchor.status !== 'closed') {
         return {
           action: 'attach',

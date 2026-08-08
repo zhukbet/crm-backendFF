@@ -60,7 +60,9 @@ export class IngestOrchestratorService {
     const decision = await this.threadGrouping.decide({
       chatId: chat.id,
       customerId: customer.id,
-      replyToTgMessageId: message.replyToTgMessageId ? BigInt(message.replyToTgMessageId) : undefined,
+      replyToTgMessageId: message.replyToTgMessageId
+        ? BigInt(message.replyToTgMessageId)
+        : undefined,
       idleWindowMinutes,
       now: new Date(),
     });

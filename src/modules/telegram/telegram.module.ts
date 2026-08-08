@@ -8,9 +8,7 @@ import { TelegramUpdateNormalizer } from './telegram-update.normalizer';
 import { TelegramService } from './telegram.service';
 
 @Module({
-  imports: [
-    BullModule.registerQueue({ name: QUEUE_INGEST }, { name: QUEUE_OUTBOUND }),
-  ],
+  imports: [BullModule.registerQueue({ name: QUEUE_INGEST }, { name: QUEUE_OUTBOUND })],
   providers: [
     TelegramService,
     TelegramUpdateNormalizer,

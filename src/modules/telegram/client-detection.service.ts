@@ -3,9 +3,7 @@ import { Agent } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 
 export type SenderClassification =
-  | { kind: 'agent'; agent: Agent }
-  | { kind: 'excluded' }
-  | { kind: 'customer' };
+  { kind: 'agent'; agent: Agent } | { kind: 'excluded' } | { kind: 'customer' };
 
 @Injectable()
 export class ClientDetectionService {

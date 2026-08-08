@@ -18,10 +18,16 @@ export interface ActiveTicketForCustomer {
  */
 export interface ThreadGroupingRepository {
   /** Rule 1: find which ticket (if any) owns the message being replied to, within this chat. */
-  findTicketByAnchorMessage(chatId: string, tgMessageId: bigint): Promise<TicketAnchorLookup | null>;
+  findTicketByAnchorMessage(
+    chatId: string,
+    tgMessageId: bigint,
+  ): Promise<TicketAnchorLookup | null>;
 
   /** Rule 2: find the most recently active non-closed ticket for this customer in this chat. */
-  findMostRecentActiveTicket(chatId: string, customerId: string): Promise<ActiveTicketForCustomer | null>;
+  findMostRecentActiveTicket(
+    chatId: string,
+    customerId: string,
+  ): Promise<ActiveTicketForCustomer | null>;
 }
 
 export type ThreadGroupingDecision =
