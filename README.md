@@ -8,9 +8,9 @@ Socket.IO. Модульний моноліт: `tickets`, `chats`, `routing`, `no
 `telegram`, `auth`, `excluded-senders` — домен спілкується подіями (`EventEmitter2`), щоб нові
 фічі підписувались на події, не чіпаючи ядро.
 
-## Статус — зупинився на Seq 37 з `support_crm_backlog.xlsx`
+## Статус — зупинився на Seq 47 з `support_crm_backlog.xlsx`
 
-Зроблено (Seq 1–19, 23, 26–27, 29, 31–37 з беклогу), код є і компілюється/лінтиться/проходить тести:
+Зроблено (Seq 1–19, 23, 26–29, 31–37, 45–47 з беклогу), код є і компілюється/лінтиться/проходить тести:
 
 - Seq 1–4 (M0): repo init, CI, Docker Compose (api/workers/postgres/redis), Dockerfile
   з цілями `api`/`workers` (з фіксами під Alpine — див. нижче), повна Prisma-схема
@@ -30,15 +30,10 @@ Socket.IO. Модульний моноліт: `tickets`, `chats`, `routing`, `no
   `IngestOrchestratorService` — вхідні повідомлення з Telegram тепер справді стають тікетами.
 - Seq 17–19 (M3): Telegram Login Widget (HMAC), сесія (HTTP-only cookie), ролі admin/lead/agent.
 - Seq 23 (M4): excluded-senders CRUD + resolve username→id + «Позначити як не клієнт».
-- Seq 26–27 (M5): стратегії маршрутизації manual/round_robin/least_busy — тепер і справді
+- Seq 26–28 (M5): стратегії маршрутизації manual/round_robin/least_busy — тепер і справді
   застосовуються при створенні нового тікета (`IngestOrchestratorService` кличе
-  `RoutingService.decideAssignment`, а не бере `chat.defaultTeamId`/`defaultAssigneeId` напряму).
-- **Проєкт реально запускається й піднімається в Docker Compose**: `main.ts`/`AppModule` (API,
-  `/api/*`, Swagger `/api/docs`+`/api/docs-json`, `GET /api/health`) і `worker.ts`/`WorkerModule`
-  — обидва перевірені і локальним boot-тестом (падають рівно на підключенні до Postgres, якщо
-  його нема), і повним прогоном через `support-crm-infra`'s `docker compose up` + smoke-test
-  CI (зелений, включно з реальним Postgres/Redis/reverse-proxy).
-
+  `RoutingService.decideAssignment`); `POST /api/tickets/:id/claim` — «беру на себе» в один клік
+  (колізії/"друкує" вже покриті `agent:typing` з Seq 15).
 - Seq 29, 31–32 (M6): нотифікації — таблиці `notifications`/`notification_prefs`,
   `NotificationEventsListener` реагує на `message.received`/`ticket.assigned`/`comment.created`
   (без прямих викликів із REST/ingest — чиста підписка на події, як і вимагає розділ 3.3),
@@ -50,6 +45,9 @@ Socket.IO. Модульний моноліт: `tickets`, `chats`, `routing`, `no
 - Seq 36–37 (M8): фонова джоба `chat_stats_daily` (BullMQ repeatable job, щодня о 01:00 UTC) +
   `/api/analytics/chats` і `/api/analytics/overview` (сума збережених днів + «сьогодні» на льоту,
   як і вимагає розділ 11 ТЗ).
+- Seq 45–47 (M9): `/api/saved-views` (особисті + спільні, з правом редагування лише власником
+  для особистих), `/api/canned-responses` (без виконання дій — див. прогалини нижче),
+  `/api/organizations` + `/api/customers/:id/organization` (історія звернень по компанії).
 - **Виправив приховану архітектурну діру у власному WS-коді з попереднього кроку**: тікети
   найчастіше створюються в процесі Workers (інжест), а WebSocket-сервер, до якого підключені
   браузери агентів, живе в процесі API — а `EventEmitter2` per-process, між ними нічого не
@@ -60,7 +58,8 @@ Socket.IO. Модульний моноліт: `tickets`, `chats`, `routing`, `no
   `/api/*`, Swagger `/api/docs`+`/api/docs-json`, `GET /api/health`) і `worker.ts`/`WorkerModule`
   — обидва перевірені і локальним boot-тестом (падають рівно на підключенні до Postgres, якщо
   його нема), і повним прогоном через `support-crm-infra`'s `docker compose up` + smoke-test
-  CI (зелений, включно з реальним Postgres/Redis/reverse-proxy) — станом на Seq 27.
+  CI (зелений, включно з реальним Postgres/Redis/reverse-proxy) — станом на Seq 37; Seq 45–47
+  поки перевірені лише локальним DI-boot-тестом, ще не через повний infra smoke-test.
 
 **Відомі прогалини навіть у зробленому:**
 
@@ -71,11 +70,11 @@ Socket.IO. Модульний моноліт: `tickets`, `chats`, `routing`, `no
 - Аналітика `avgFirstResponseSec`/`avgResolutionSec` за діапазон днів — неозважене середнє
   середніх по днях, не по кожному тікету: `chat_stats_daily` зберігає лише агрегат на день,
   не сирі семпли, тож точне зважене середнє за діапазон без зміни структури таблиці неможливе.
-- Локальний boot-тест і повний infra-прогін (Docker+Postgres+Redis) для змін цього кроку
-  (Seq 29–37) ще не перепрогнаний через `support-crm-infra` — тільки локальний DI-boot-тест
-  без реальної БД/Redis. Наступний крок — оновити submodule і прогнати smoke-test.
-- Claim/колізії (Seq 28), і все, що в CRM-рівні (Seq 39+: saved views, canned responses,
-  organizations, audit log UI, командна палітра) — ще не почато.
+- `canned_responses.variables` зберігає лише назви {плейсхолдерів}, не дії — макрос, що сам
+  ставить лейбл/статус/пріоритет (розділ 12 ТЗ), у поточній схемі не представлений; це має
+  робити клієнт (застосувати текст, потім звичайний `PATCH /tickets/:id`).
+- Все, що лишилось у CRM-рівні: Seq 48–49 (audit log UI, командна палітра — обидва Frontend,
+  не сюди), і все після M9 (M10–M13 — Frontend/DevOps/QA).
 
 ## Запуск
 

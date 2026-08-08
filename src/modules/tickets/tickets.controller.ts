@@ -63,6 +63,12 @@ export class TicketsController {
     return this.tickets.assign(id, dto.agent_id, agent.id, dto.reason);
   }
 
+  /** Seq 28: "беру на себе" — self-assign in one click, no agent_id needed in the body. */
+  @Post(':id/claim')
+  claim(@Param('id') id: string, @CurrentAgent() agent: Agent) {
+    return this.tickets.assign(id, agent.id, agent.id);
+  }
+
   @Post(':id/close')
   close(@Param('id') id: string, @CurrentAgent() agent: Agent) {
     return this.tickets.close(id, agent.id);
