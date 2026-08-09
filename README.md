@@ -126,6 +126,29 @@ DI-boot-тест (падає ще до підключення БД) — необ
 - Все, що лишилось у CRM-рівні: Seq 48–49 (audit log UI, командна палітра — обидва Frontend,
   не сюди), і все після M9 (M10–M13 — Frontend/DevOps/QA).
 
+## M13: e2e-тести й DoD-чекліст
+
+- **`npm run test:e2e`** — 8 тестів проти реального (не мокованого) Postgres/Redis:
+  DoD-флоу (авто-тікет, claim/reply/close + audit-events), усі 3 правила групування
+  тредів з розділу 4, розділ 8а (excluded sender, mark-not-customer), дедуп-бекстоп.
+  Піднімає `AppModule` напряму через `Test.createTestingModule` (не через
+  `main.ts`/webhook), тому власноруч імпортує `common/bigint-json` і ставить той
+  самий `ValidationPipe`, що й прод — інакше не був би репрезентативним. Потребує
+  окремої тестової БД (`prisma migrate deploy` на неї) — деталі в `test/app.e2e-spec.ts`.
+- Живий прогін e2e виявив ще одну прогалину поза юніт-тестами: спільний BullMQ
+  Redis-конекшн (`bull-root.module.ts`) ніколи не закривався на shutdown — BullMQ
+  свідомо не закриває з'єднання, які отримав ззовні. Виніс у `RedisConnectionService`
+  з `OnModuleDestroy`, тим же патерном що вже був у `ApiEventSubscriber`. Заразом
+  додав `app.enableShutdownHooks()` у `main.ts`/`worker.ts` — без нього SIGTERM
+  (як Docker/k8s зупиняють контейнер) не викликає `onModuleDestroy` взагалі.
+- **[`DOD.md`](./DOD.md)** — чесна звірка з розділом 16 ТЗ, пункт за пунктом, з
+  посиланням на конкретний код/тест. Підсумок: 11/13 повністю готово й перевірено;
+  2 пункти (Jira-звʼязування, екран "Виключені відправники") мають повний і
+  перевірений бекенд, але без фронтенд-UI — фронтенд у цій сесії свідомо не чіпався.
+- Прод-деплой (Seq 55): реальних хостинг-креденшелів немає, тож живого деплою тут
+  не буде — Docker-образи, health-check і graceful shutdown вже готові й перевірені
+  (`crm-infraFF/docker-compose.yml`), лишається підключити реальний хост і CD.
+
 ## Запуск
 
 ```bash
