@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { TelegramOutboundProducer } from '../telegram/telegram-outbound.producer';
 import { DOMAIN_EVENTS } from './events/domain-events';
@@ -12,7 +13,15 @@ export class MessagesService {
     private readonly outboundProducer: TelegramOutboundProducer,
   ) {}
 
-  /** Persists an inbound customer message and bumps the ticket's activity/anchor pointers. */
+  /**
+   * Persists an inbound customer message and bumps the ticket's activity/anchor pointers.
+   *
+   * Section 3.4's primary dedup is the ingest queue's jobId (chatId+tgMessageId) — BullMQ
+   * drops re-enqueued duplicates before they ever reach here. This is the backstop for the
+   * rare case one still slips through (e.g. Telegram redelivers after the job's dedup window
+   * expired): the DB's `@@unique([tgMessageId, ticketId])` constraint catches it, and instead
+   * of failing the job we treat it as "already processed" and return the existing row.
+   */
   async recordIncoming(params: {
     ticketId: string;
     tgMessageId: bigint;
@@ -20,23 +29,36 @@ export class MessagesService {
     attachments: Array<{ type: string; fileId: string }>;
     isNewTicket: boolean;
   }) {
-    const message = await this.prisma.$transaction(async (tx) => {
-      const created = await tx.message.create({
-        data: {
-          ticketId: params.ticketId,
-          direction: 'in',
-          sender: 'customer',
-          tgMessageId: params.tgMessageId,
-          text: params.text,
-          attachments: params.attachments as any,
-        },
+    let message;
+    try {
+      message = await this.prisma.$transaction(async (tx) => {
+        const created = await tx.message.create({
+          data: {
+            ticketId: params.ticketId,
+            direction: 'in',
+            sender: 'customer',
+            tgMessageId: params.tgMessageId,
+            text: params.text,
+            attachments: params.attachments as any,
+          },
+        });
+        await tx.ticket.update({
+          where: { id: params.ticketId },
+          data: { lastClientMessageTgId: params.tgMessageId },
+        });
+        return created;
       });
-      await tx.ticket.update({
-        where: { id: params.ticketId },
-        data: { lastClientMessageTgId: params.tgMessageId },
-      });
-      return created;
-    });
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        const existing = await this.prisma.message.findUnique({
+          where: {
+            tgMessageId_ticketId: { tgMessageId: params.tgMessageId, ticketId: params.ticketId },
+          },
+        });
+        if (existing) return existing;
+      }
+      throw err;
+    }
 
     this.events.emit(DOMAIN_EVENTS.MESSAGE_RECEIVED, {
       ticketId: params.ticketId,
