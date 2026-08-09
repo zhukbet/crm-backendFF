@@ -57,7 +57,10 @@ export class AuthController {
   @Post('auth/logout')
   @UseGuards(AllowlistGuard)
   async logout(@Res({ passthrough: true }) res: Response) {
-    res.clearCookie(this.sessions.cookieName, { path: '/' });
+    // Must match the attributes the cookie was set with (secure/sameSite in particular) — a
+    // clearCookie() with different attributes doesn't reliably expire it in every browser, so
+    // the session would silently outlive "logout" until it hit its own 7-day expiry.
+    res.clearCookie(this.sessions.cookieName, this.sessions.clearCookieOptions());
     return { ok: true };
   }
 

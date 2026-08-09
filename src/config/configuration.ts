@@ -1,11 +1,10 @@
+import { parseFrontendOrigins } from './frontend-origins';
+
 export default () => ({
   port: parseInt(process.env.PORT ?? '3000', 10),
   // Comma-separated for setups with more than one legitimate origin (e.g. a deployed frontend
   // plus a local dev server hitting the same tunneled backend).
-  frontendOrigins: (process.env.FRONTEND_ORIGIN ?? 'http://localhost:5173')
-    .split(',')
-    .map((origin) => origin.trim())
-    .filter(Boolean),
+  frontendOrigins: parseFrontendOrigins(),
   database: {
     url: process.env.DATABASE_URL,
   },

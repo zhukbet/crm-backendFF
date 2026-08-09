@@ -10,6 +10,7 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { parseFrontendOrigins } from '../../config/frontend-origins';
 import { SessionService } from '../auth/session.service';
 import {
   AgentTypingEvent,
@@ -43,7 +44,7 @@ function extractCookie(cookieHeader: string | undefined, name: string): string |
  */
 @WebSocketGateway({
   namespace: '/ws',
-  cors: { origin: process.env.FRONTEND_ORIGIN ?? 'http://localhost:5173', credentials: true },
+  cors: { origin: parseFrontendOrigins(), credentials: true },
 })
 export class TicketsGateway implements OnGatewayConnection {
   @WebSocketServer() server!: Server;
