@@ -104,8 +104,11 @@ describe('Support CRM — core flows (e2e, real DB)', () => {
       .get(`/api/tickets/${ticket.id}/messages`)
       .set('Cookie', agentCookie)
       .expect(200);
-    expect(messagesRes.body).toHaveLength(1);
-    expect(messagesRes.body[0].text).toBe('Застосунок не працює');
+    const customerMessage = messagesRes.body.find((m: any) => m.direction === 'in');
+    expect(customerMessage?.text).toBe('Застосунок не працює');
+    // New tickets also get an automated bot acknowledgement (see MessagesService.sendAutoAcknowledgement).
+    const botMessage = messagesRes.body.find((m: any) => m.sender === 'bot');
+    expect(botMessage).toBeDefined();
   });
 
   it('DoD: claim, reply, and manual close all work end to end', async () => {
@@ -188,7 +191,9 @@ describe('Support CRM — core flows (e2e, real DB)', () => {
     expect(allTickets).toHaveLength(1);
     expect(allTickets[0].id).toBe(first.id);
 
-    const messages = await prisma.message.findMany({ where: { ticketId: first.id } });
+    const messages = await prisma.message.findMany({
+      where: { ticketId: first.id, direction: 'in' },
+    });
     expect(messages).toHaveLength(2);
   });
 
@@ -314,7 +319,9 @@ describe('Support CRM — core flows (e2e, real DB)', () => {
       where: { chat: { telegramChatId: BigInt(chatId) } },
     });
     expect(tickets).toHaveLength(1);
-    const messages = await prisma.message.findMany({ where: { ticketId: tickets[0].id } });
+    const messages = await prisma.message.findMany({
+      where: { ticketId: tickets[0].id, direction: 'in' },
+    });
     expect(messages).toHaveLength(1);
   });
 

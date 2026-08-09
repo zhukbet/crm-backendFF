@@ -35,7 +35,9 @@ export interface MessageReceivedEvent {
 export interface MessageSentEvent {
   ticketId: string;
   messageId: string;
-  agentId: string;
+  // Absent for automated messages (e.g. the new-ticket acknowledgement) — nothing sent by an
+  // actual agent.
+  agentId?: string;
 }
 export interface CommentCreatedEvent {
   ticketId: string;

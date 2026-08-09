@@ -1,12 +1,16 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { TelegramOutboundProducer } from '../telegram/telegram-outbound.producer';
 import { DOMAIN_EVENTS } from './events/domain-events';
 
+const AUTO_ACK_TEXT = 'Дякую за ваше повідомлення,\nМи взяли в роботу — скоро до вас повернемось.';
+
 @Injectable()
 export class MessagesService {
+  private readonly logger = new Logger(MessagesService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly events: EventEmitter2,
@@ -65,7 +69,50 @@ export class MessagesService {
       messageId: message.id,
       isNewTicket: params.isNewTicket,
     });
+
+    if (params.isNewTicket) {
+      // Best-effort: an outbound hiccup here shouldn't fail (and retry) the ingest job that
+      // already successfully recorded the customer's message.
+      try {
+        await this.sendAutoAcknowledgement(params.ticketId, params.tgMessageId);
+      } catch (err) {
+        this.logger.warn(`Auto-acknowledgement failed for ticket ${params.ticketId}: ${err}`);
+      }
+    }
+
     return message;
+  }
+
+  /** Immediate bot reply on brand-new tickets so the customer knows the message landed,
+   * before an agent has had a chance to look at it. Never touches firstResponseAt — that
+   * metric tracks real agent responsiveness, not this automated line. */
+  private async sendAutoAcknowledgement(ticketId: string, replyToTgMessageId: bigint) {
+    const ticket = await this.prisma.ticket.findUnique({
+      where: { id: ticketId },
+      include: { chat: true },
+    });
+    if (!ticket) return;
+
+    const created = await this.prisma.message.create({
+      data: {
+        ticketId,
+        direction: 'out',
+        sender: 'bot',
+        tgMessageId: null,
+        text: AUTO_ACK_TEXT,
+        attachments: [],
+      },
+    });
+
+    await this.outboundProducer.enqueueReply({
+      ticketId,
+      messageId: created.id,
+      telegramChatId: String(ticket.chat.telegramChatId),
+      text: AUTO_ACK_TEXT,
+      replyToTgMessageId: String(replyToTgMessageId),
+    });
+
+    this.events.emit(DOMAIN_EVENTS.MESSAGE_SENT, { ticketId, messageId: created.id });
   }
 
   /** Section 6: agent reply — persisted, sent to Telegram via the outbound queue. */
@@ -81,7 +128,19 @@ export class MessagesService {
     });
     if (!ticket) throw new NotFoundException('Ticket not found');
 
-    const replyToTgMessageId = ticket.lastClientMessageTgId ?? ticket.anchorMessageTgId;
+    // Quote only the first agent reply after a client message, not every consecutive one — once
+    // the agent has already replied to the client's latest message, further replies read as a
+    // normal back-and-forth instead of repeating the same quoted bubble on every message.
+    const lastMessage = await this.prisma.message.findFirst({
+      where: { ticketId: ticket.id },
+      orderBy: { createdAt: 'desc' },
+    });
+    const replyToTgMessageId =
+      lastMessage?.direction === 'in'
+        ? lastMessage.tgMessageId
+        : lastMessage
+          ? undefined
+          : (ticket.lastClientMessageTgId ?? ticket.anchorMessageTgId);
 
     const message = await this.prisma.$transaction(async (tx) => {
       const created = await tx.message.create({

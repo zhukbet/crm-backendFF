@@ -29,10 +29,12 @@ export class SessionService {
   }
 
   cookieOptions() {
+    const crossSite = this.config.get<boolean>('auth.cookieCrossSite');
     return {
       httpOnly: true,
-      sameSite: 'lax' as const,
-      secure: this.config.get<string>('NODE_ENV') === 'production',
+      // SameSite=None requires Secure — browsers silently drop the cookie otherwise.
+      sameSite: (crossSite ? 'none' : 'lax') as 'none' | 'lax',
+      secure: crossSite || this.config.get<string>('NODE_ENV') === 'production',
       maxAge: 7 * 24 * 60 * 60 * 1000,
       path: '/',
     };
