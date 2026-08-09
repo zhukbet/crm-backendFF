@@ -2,7 +2,7 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 
-const STATUSES = ['open', 'pending', 'on_hold', 'solved', 'closed'] as const;
+const STATUSES = ['open', 'pending', 'on_hold', 'solved', 'closed', 'archived'] as const;
 
 export class ListTicketsQueryDto {
   @ApiPropertyOptional({ enum: STATUSES })

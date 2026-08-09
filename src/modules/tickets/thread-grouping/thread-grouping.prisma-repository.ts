@@ -28,7 +28,7 @@ export class PrismaThreadGroupingRepository implements ThreadGroupingRepository 
     customerId: string,
   ): Promise<ActiveTicketForCustomer | null> {
     const ticket = await this.prisma.ticket.findFirst({
-      where: { chatId, customerId, status: { not: 'closed' } },
+      where: { chatId, customerId, status: { notIn: ['closed', 'archived'] } },
       orderBy: { updatedAt: 'desc' },
       select: { id: true, status: true, updatedAt: true },
     });

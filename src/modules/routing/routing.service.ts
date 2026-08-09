@@ -29,7 +29,10 @@ export class RoutingService {
     if (chat.routingStrategy === 'least_busy') {
       const openCounts = await this.prisma.ticket.groupBy({
         by: ['assigneeId'],
-        where: { assigneeId: { in: memberIds }, status: { notIn: ['solved', 'closed'] } },
+        where: {
+          assigneeId: { in: memberIds },
+          status: { notIn: ['solved', 'closed', 'archived'] },
+        },
         _count: true,
       });
       const countByAgent = new Map(memberIds.map((id) => [id, 0]));

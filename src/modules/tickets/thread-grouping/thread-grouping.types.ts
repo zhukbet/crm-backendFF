@@ -1,13 +1,14 @@
 export type ReopenableTicketStatus = 'open' | 'pending' | 'on_hold' | 'solved';
+export type TerminalTicketStatus = 'closed' | 'archived';
 
 export interface TicketAnchorLookup {
   ticketId: string;
-  status: ReopenableTicketStatus | 'closed';
+  status: ReopenableTicketStatus | TerminalTicketStatus;
 }
 
 export interface ActiveTicketForCustomer {
   ticketId: string;
-  status: ReopenableTicketStatus | 'closed';
+  status: ReopenableTicketStatus | TerminalTicketStatus;
   lastActivityAt: Date;
 }
 

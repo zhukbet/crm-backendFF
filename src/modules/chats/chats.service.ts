@@ -72,7 +72,7 @@ export class ChatsService {
     return chats.map((chat) => {
       const chatStats = stats.filter((s) => s.chatId === chat.id);
       const open = chatStats
-        .filter((s) => s.status !== 'closed' && s.status !== 'solved')
+        .filter((s) => s.status !== 'closed' && s.status !== 'solved' && s.status !== 'archived')
         .reduce((sum, s) => sum + s._count, 0);
       const total = chatStats.reduce((sum, s) => sum + s._count, 0);
       return { ...chat, backlog: open, ticketsTotal: total };

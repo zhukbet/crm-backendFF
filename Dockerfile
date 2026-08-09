@@ -33,6 +33,13 @@ COPY package*.json ./
 RUN npm install --omit=dev
 COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=build /app/dist ./dist
+# Agent-attached uploads (UploadsController) live here — mounted as a volume in
+# docker-compose.yml so they survive container recreation. Created and owned by `node` (the
+# non-root user both final stages run as, per Docker/OWASP best practice: a compromised Node
+# process shouldn't have root inside its own container) up front, since a volume mounted over
+# a root-owned directory at `docker run` time would otherwise deny this user write access.
+RUN mkdir -p /app/uploads && chown -R node:node /app
+USER node
 
 FROM runtime AS api
 EXPOSE 3000

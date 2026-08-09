@@ -3,6 +3,7 @@ import { THREAD_GROUPING_REPOSITORY } from './thread-grouping.tokens';
 import { ThreadGroupingDecision, ThreadGroupingRepository } from './thread-grouping.types';
 
 const REOPENABLE = new Set(['open', 'pending', 'on_hold', 'solved']);
+const TERMINAL = new Set(['closed', 'archived']);
 
 export interface ThreadGroupingInput {
   chatId: string;
@@ -31,7 +32,7 @@ export class ThreadGroupingService {
         input.chatId,
         input.replyToTgMessageId,
       );
-      if (anchor && anchor.status !== 'closed') {
+      if (anchor && !TERMINAL.has(anchor.status)) {
         return {
           action: 'attach',
           ticketId: anchor.ticketId,

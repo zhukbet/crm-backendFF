@@ -1,4 +1,5 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
@@ -15,7 +16,14 @@ export class MessagesService {
     private readonly prisma: PrismaService,
     private readonly events: EventEmitter2,
     private readonly outboundProducer: TelegramOutboundProducer,
+    private readonly config: ConfigService,
   ) {}
+
+  /** fileId is just the filename UploadsController stored it under — the URL is always
+   * derivable from it, so callers only ever need to pass the id around. */
+  private attachmentUrl(fileId: string): string {
+    return `${this.config.get<string>('publicUrl')}/uploads/${fileId}`;
+  }
 
   /**
    * Persists an inbound customer message and bumps the ticket's activity/anchor pointers.
@@ -121,6 +129,9 @@ export class MessagesService {
     agentId: string;
     text: string;
     attachments?: string[];
+    /** true: force-quote the client's last message. false: never quote. undefined: auto — quote
+     * only the first reply after a client message, per the heuristic below. */
+    asReply?: boolean;
   }) {
     const ticket = await this.prisma.ticket.findUnique({
       where: { id: params.ticketId },
@@ -128,19 +139,29 @@ export class MessagesService {
     });
     if (!ticket) throw new NotFoundException('Ticket not found');
 
-    // Quote only the first agent reply after a client message, not every consecutive one — once
-    // the agent has already replied to the client's latest message, further replies read as a
-    // normal back-and-forth instead of repeating the same quoted bubble on every message.
-    const lastMessage = await this.prisma.message.findFirst({
-      where: { ticketId: ticket.id },
-      orderBy: { createdAt: 'desc' },
-    });
-    const replyToTgMessageId =
-      lastMessage?.direction === 'in'
-        ? lastMessage.tgMessageId
-        : lastMessage
-          ? undefined
-          : (ticket.lastClientMessageTgId ?? ticket.anchorMessageTgId);
+    const anchorTgMessageId = ticket.lastClientMessageTgId ?? ticket.anchorMessageTgId;
+    let replyToTgMessageId: bigint | null | undefined;
+    if (params.asReply === false) {
+      replyToTgMessageId = undefined;
+    } else if (params.asReply === true) {
+      // Explicit override — reply again even if an agent message already quoted this one.
+      replyToTgMessageId = anchorTgMessageId;
+    } else {
+      // Auto (no explicit choice): quote only the first agent reply after a client message,
+      // not every consecutive one — once the agent has already replied to the client's latest
+      // message, further replies read as a normal back-and-forth instead of repeating the same
+      // quoted bubble on every message.
+      const lastMessage = await this.prisma.message.findFirst({
+        where: { ticketId: ticket.id },
+        orderBy: { createdAt: 'desc' },
+      });
+      replyToTgMessageId =
+        lastMessage?.direction === 'in'
+          ? lastMessage.tgMessageId
+          : lastMessage
+            ? undefined
+            : anchorTgMessageId;
+    }
 
     const message = await this.prisma.$transaction(async (tx) => {
       const created = await tx.message.create({
@@ -171,6 +192,10 @@ export class MessagesService {
       telegramChatId: String(ticket.chat.telegramChatId),
       text: params.text,
       replyToTgMessageId: replyToTgMessageId ? String(replyToTgMessageId) : undefined,
+      attachments: params.attachments?.map((fileId) => ({
+        fileId,
+        url: this.attachmentUrl(fileId),
+      })),
     });
 
     this.events.emit(DOMAIN_EVENTS.MESSAGE_SENT, {

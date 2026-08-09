@@ -1,15 +1,26 @@
 import 'reflect-metadata';
 import './common/bigint-json';
+import { mkdirSync } from 'fs';
+import { join } from 'path';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const config = app.get(ConfigService);
+
+  // Agent-attached media (see UploadsController) lives here — a Docker volume in prod so it
+  // survives container restarts, see crm-infraFF/docker-compose.yml.
+  const uploadsDir = join(process.cwd(), 'uploads');
+  mkdirSync(uploadsDir, { recursive: true });
+  // Deliberately outside setGlobalPrefix('api') below — Telegram fetches these URLs directly
+  // and the /uploads path is what UploadsController already hands back in its response.
+  app.useStaticAssets(uploadsDir, { prefix: '/uploads' });
 
   // Without this, SIGTERM/SIGINT (how Docker/k8s stop a container) never fires
   // onModuleDestroy — Redis/Prisma connections would leak instead of closing cleanly.

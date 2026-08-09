@@ -1,7 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsArray, IsDateString, IsIn, IsOptional, IsString, IsUUID } from 'class-validator';
 
-const STATUSES = ['open', 'pending', 'on_hold', 'solved', 'closed'] as const;
+const STATUSES = ['open', 'pending', 'on_hold', 'solved', 'closed', 'archived'] as const;
 const PRIORITIES = ['urgent', 'high', 'normal', 'low'] as const;
 
 export class PatchTicketDto {

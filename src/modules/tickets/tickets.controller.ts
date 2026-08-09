@@ -52,6 +52,7 @@ export class TicketsController {
       agentId: agent.id,
       text: dto.text,
       attachments: dto.attachments,
+      asReply: dto.asReply,
     });
   }
 

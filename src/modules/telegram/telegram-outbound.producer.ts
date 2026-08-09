@@ -10,6 +10,7 @@ export interface OutboundReplyJob {
   telegramChatId: string;
   text: string;
   replyToTgMessageId?: string;
+  attachments?: Array<{ fileId: string; url: string }>;
 }
 
 @Injectable()

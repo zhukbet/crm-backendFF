@@ -30,6 +30,7 @@ enum TicketStatus {
   on_hold
   solved
   closed
+  archived
 }
 
 enum TicketPriority {

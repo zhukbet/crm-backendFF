@@ -13,6 +13,7 @@ import { SavedViewsModule } from './modules/saved-views/saved-views.module';
 import { TeamsModule } from './modules/teams/teams.module';
 import { TelegramWebhookModule } from './modules/telegram/telegram-webhook.module';
 import { TicketsModule } from './modules/tickets/tickets.module';
+import { UploadsModule } from './modules/uploads/uploads.module';
 
 /**
  * The API process (main.ts): HTTP + WS. Does not include queue processors — those live in
@@ -35,6 +36,7 @@ import { TicketsModule } from './modules/tickets/tickets.module';
     OrganizationsModule,
     TeamsModule,
     HealthModule,
+    UploadsModule,
   ],
   providers: [ApiEventSubscriber],
 })

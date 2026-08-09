@@ -23,12 +23,13 @@ export class OutboundProcessor extends WorkerHost {
   }
 
   async process(job: Job<OutboundReplyJob>): Promise<void> {
-    const { messageId, telegramChatId, text, replyToTgMessageId } = job.data;
+    const { messageId, telegramChatId, text, replyToTgMessageId, attachments } = job.data;
 
     const sent = await this.telegram.sendReply({
       chatId: BigInt(telegramChatId),
       text,
       replyToMessageId: replyToTgMessageId ? BigInt(replyToTgMessageId) : undefined,
+      attachments,
     });
 
     await this.messages.confirmOutgoingSent(messageId, sent.tgMessageId);

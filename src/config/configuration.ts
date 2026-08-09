@@ -27,4 +27,11 @@ export default () => ({
   routing: {
     threadIdleWindowMinutes: parseInt(process.env.THREAD_IDLE_WINDOW_MINUTES ?? '180', 10),
   },
+  // This backend's own publicly reachable origin — needed so uploaded-file URLs handed to
+  // Telegram's sendPhoto/sendDocument are fetchable from Telegram's servers, not just from
+  // whatever machine is running this process.
+  publicUrl: (process.env.PUBLIC_URL ?? `http://localhost:${process.env.PORT ?? '3000'}`).replace(
+    /\/$/,
+    '',
+  ),
 });

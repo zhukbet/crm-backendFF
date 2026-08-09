@@ -123,7 +123,7 @@ export class AnalyticsService {
         }
 
         const backlog = await this.prisma.ticket.count({
-          where: { chatId: chat.id, status: { notIn: ['solved', 'closed'] } },
+          where: { chatId: chat.id, status: { notIn: ['solved', 'closed', 'archived'] } },
         });
 
         return {

@@ -65,13 +65,37 @@ export class TelegramService {
     chatId: bigint;
     text: string;
     replyToMessageId?: bigint;
+    attachments?: Array<{ url: string }>;
   }): Promise<{ tgMessageId: bigint }> {
-    const message = await this.bot.api.sendMessage(Number(params.chatId), params.text, {
-      reply_parameters: params.replyToMessageId
-        ? { message_id: Number(params.replyToMessageId) }
-        : undefined,
-    });
-    return { tgMessageId: BigInt(message.message_id) };
+    const replyParameters = params.replyToMessageId
+      ? { message_id: Number(params.replyToMessageId) }
+      : undefined;
+
+    if (!params.attachments?.length) {
+      const message = await this.bot.api.sendMessage(Number(params.chatId), params.text, {
+        reply_parameters: replyParameters,
+      });
+      return { tgMessageId: BigInt(message.message_id) };
+    }
+
+    // Telegram's sendPhoto/sendDocument accept a plain URL in place of re-uploading the file's
+    // bytes through our bot connection — they fetch it themselves. Text goes as the caption on
+    // the first attachment (Telegram has no separate "attach N files to one text message" call);
+    // only that first send carries reply_parameters, so a multi-file reply doesn't show as N
+    // separate quotes of the same client message.
+    let firstTgMessageId: bigint | undefined;
+    for (const [index, attachment] of params.attachments.entries()) {
+      const isImage = /\.(jpe?g|png|gif|webp)$/i.test(attachment.url);
+      const options = {
+        caption: index === 0 && params.text ? params.text : undefined,
+        reply_parameters: index === 0 ? replyParameters : undefined,
+      };
+      const message = isImage
+        ? await this.bot.api.sendPhoto(Number(params.chatId), attachment.url, options)
+        : await this.bot.api.sendDocument(Number(params.chatId), attachment.url, options);
+      if (index === 0) firstTgMessageId = BigInt(message.message_id);
+    }
+    return { tgMessageId: firstTgMessageId! };
   }
 
   async sendDirectMessage(telegramUserId: bigint, text: string): Promise<void> {

@@ -5,3 +5,4 @@ dist
 .git
 coverage
 *.log
+/uploads
